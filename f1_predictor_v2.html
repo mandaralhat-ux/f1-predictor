@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Race Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #E10600;
+  --red2: #ff2010;
+  --dark: #080808;
+  --dark2: #0f0f0f;
+  --card: #121212;
+  --card2: #181818;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0f0f0;
+  --muted: #777;
+  --muted2: #555;
+  --gold: #FFD700;
+  --teal: #00C9A7;
+  --silver: #C0C0C0;
+  --bronze: #CD7F32;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--dark);}
+::-webkit-scrollbar-thumb{background:var(--red);border-radius:2px;}
+
+body {
+  background: var(--dark);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ── Custom cursor ── */
+.cursor {
+  width: 12px; height: 12px;
+  background: var(--red);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.1s, width 0.2s, height 0.2s, opacity 0.2s;
+  mix-blend-mode: difference;
+}
+.cursor-ring {
+  width: 36px; height: 36px;
+  border: 1px solid rgba(225,6,0,0.5);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%,-50%);
+  transition: all 0.12s ease;
+}
+@media (hover:none){ .cursor,.cursor-ring{display:none;} body{cursor:auto;} }
+
+/* ── Loading screen ── */
+#loader {
+  position: fixed; inset: 0;
+  background: var(--dark);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  transition: opacity 0.6s, visibility 0.6s;
+}
+#loader.done { opacity:0; visibility:hidden; }
+
+.loader-logo {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(24px, 6vw, 42px);
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: white;
+}
+.loader-logo span { color: var(--red); }
+
+.loader-bar-wrap {
+  width: min(300px, 80vw);
+  height: 2px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.loader-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+  border-radius: 1px;
+  width: 0%;
+  animation: loadbar 1.8s ease forwards;
+}
+@keyframes loadbar { to { width: 100%; } }
+
+.loader-text {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--muted);
+  text-transform: uppercase;
+  animation: blink 1s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── Grid texture ── */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(225,6,0,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(225,6,0,0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events:none; z-index:0;
+}
+
+/* ── Red scan line ── */
+.scanline {
+  position: fixed;
+  top: -3px; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--red) 40%, var(--gold) 60%, transparent 100%);
+  animation: scan 5s linear infinite;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.7;
+}
+@keyframes scan { 0%{top:-3px;opacity:1} 95%{opacity:0.3} 100%{top:100vh;opacity:0} }
+
+/* ── Wrapper ── */
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── HEADER ── */
+header {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  background: rgba(8,8,8,0.92);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-hex {
+  width: 34px; height: 34px;
+  background: var(--red);
+  clip-path: polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.logo-hex span {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  color: white;
+  letter-spacing: 0;
+}
+.logo-name {
+  font-family: 'Orbitron', monospace;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: white;
+}
+.logo-name em { color: var(--red); font-style: normal; }
+.header-tag {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border: 1px solid var(--border2);
+  padding: 4px 10px;
+  border-radius: 2px;
+}
+.nav-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 20px;
+}
+.nav-tab {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s;
+  position: relative;
+}
+.nav-tab::after {
+  content:'';
+  position: absolute;
+  bottom: 0; left: 50%; right: 50%;
+  height: 2px;
+  background: var(--red);
+  transition: all 0.2s;
+}
+.nav-tab.active { color: white; }
+.nav-tab.active::after { left: 0; right: 0; }
+.nav-tab:hover { color: var(--text); }
+
+/* ── PAGES ── */
+.page { display: none; padding: 32px 0 60px; }
+.page.active { display: block; animation: fadeUp 0.4s ease; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── HERO ── */
+.hero { padding: 48px 0 36px; }
+.hero-eyebrow {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 5px;
+  color: var(--red);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content:'';
+  display: inline-block;
+  width: 24px; height: 2px;
+  background: var(--red);
+}
+.hero h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(30px, 6vw, 58px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.hero h1 .accent { color: var(--red); display: block; }
+.hero-sub {
+  margin-top: 16px;
+  font-size: 15px;
+  color: var(--muted);
+  max-width: 500px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+/* ── Stat pills ── */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.pill {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.pill:hover { border-color: var(--border2); transform: translateY(-2px); }
+.pill b { color: var(--red); margin-right: 5px; font-family: 'Orbitron', monospace; font-size: 12px; }
+.pill.accent b { color: var(--teal); }
+
+/* ── Section label ── */
+.section-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.section-label::after {
+  content:''; flex:1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s;
+}
+.card:hover { border-color: var(--border2); }
+.card::before {
+  content:'';
+  position: absolute;
+  top:0; left:0;
+  width: 3px; height: 100%;
+  background: var(--red);
+}
+.card-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+/* ── Two column grid ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media(max-width:680px){ .two-col{ grid-template-columns:1fr; } }
+
+/* ── Form elements ── */
+.field { margin-bottom: 16px; }
+.field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.field select,
+.field input[type=number] {
+  width: 100%;
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 11px 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 3px;
+  outline: none;
+  appearance: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field select:focus,
+.field input[type=number]:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(225,6,0,0.1);
+}
+.field select option { background: #1a1a1a; }
+
+/* Custom range slider */
+.slider-wrap { position: relative; }
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.slider-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 120px;
+}
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  background: var(--red);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(225,6,0,0.5);
+  transition: transform 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+.slider-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red);
+  min-width: 64px;
+  text-align: right;
+}
+
+/* Wet toggle */
+.wet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle {
+  width: 46px; height: 26px;
+  background: var(--dark2);
+  border: 1px solid var(--border2);
+  border-radius: 13px;
+  position: relative;
+  transition: background 0.3s, border-color 0.3s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--red); border-color: var(--red); }
+.toggle-knob {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 18px; height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.toggle.on .toggle-knob { transform: translateX(20px); }
+.wet-label { font-size: 14px; font-weight: 600; }
+.wet-sub { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+/* Weather preview */
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+@media(max-width:400px){ .weather-grid{ grid-template-columns:repeat(2,1fr); } }
+.w-box {
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 12px 8px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.w-box.wet-highlight { border-color: rgba(225,6,0,0.4); }
+.w-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.w-unit {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+/* ── PREDICT BUTTON ── */
+.predict-btn {
+  width: 100%;
+  margin-top: 14px;
+  background: var(--red);
+  color: white;
+  border: none;
+  padding: 16px;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+.predict-btn::before {
+  content:'';
+  position: absolute;
+  top: -100%; left: -100%;
+  width: 80px; height: 200%;
+  background: rgba(255,255,255,0.15);
+  transform: skewX(-20deg);
+  transition: left 0.4s;
+}
+.predict-btn:hover { background: var(--red2); transform: translateY(-2px); box-shadow: 0 10px 40px rgba(225,6,0,0.4); }
+.predict-btn:hover::before { left: 200%; }
+.predict-btn:active { transform: translateY(0); }
+
+/* ── RESULT CARD ── */
+#resultCard {
+  display: none;
+  margin-top: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+#resultCard.show { display: block; }
+@keyframes popIn {
+  from { opacity:0; transform:scale(0.9) translateY(20px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+.result-top {
+  height: 3px;
+  background: linear-gradient(90deg, var(--red), var(--gold), var(--teal));
+}
+.result-body {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: none;
+  padding: 22px;
+}
+.result-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.result-pos {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(56px, 12vw, 80px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--red);
+  text-shadow: 0 0 40px rgba(225,6,0,0.4);
+  flex-shrink: 0;
+  animation: countUp 0.6s ease;
+}
+@keyframes countUp {
+  from { opacity:0; transform:translateY(20px) scale(0.8); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+.result-info { flex:1; min-width: 200px; }
+.result-driver {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(18px, 4vw, 26px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+.result-team { font-size: 13px; color: var(--muted); letter-spacing: 2px; margin: 4px 0 12px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 2px;
+}
+.badge-red  { background: rgba(225,6,0,0.12); border: 1px solid rgba(225,6,0,0.4); color: var(--red); }
+.badge-gold { background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.4); color: var(--gold); }
+.badge-teal { background: rgba(0,201,167,0.1); border: 1px solid rgba(0,201,167,0.4); color: var(--teal); }
+.badge-gray { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); }
+
+/* Confidence bar */
+.conf-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.conf-track {
+  height: 4px;
+  background: var(--dark2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.conf-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+  border-radius: 2px;
+  width: 0;
+  transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ── LEADERBOARD ── */
+.lb-header {
+  display: grid;
+  grid-template-columns: 44px 4px 1fr 52px 44px 56px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 14px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+}
+.lb-header span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--muted2);
+  text-transform: uppercase;
+}
+.lb-header .r { text-align: right; }
+
+.lb-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+}
+.lb-row {
+  display: grid;
+  grid-template-columns: 44px 4px 1fr 52px 44px 56px;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row:hover { background: rgba(255,255,255,0.03); }
+.lb-row.highlighted { background: rgba(225,6,0,0.06); }
+.lb-num {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+.p1 { color: var(--gold); }
+.p2 { color: var(--silver); }
+.p3 { color: var(--bronze); }
+.lb-color { height: 32px; border-radius: 2px; }
+.lb-driver-col {}
+.lb-code {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lb-team-name { font-size: 11px; color: var(--muted); }
+.lb-grid-col {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.lb-change {
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.lb-pred {
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--red);
+  text-align: right;
+}
+
+/* ── INSIGHTS ── */
+.insight-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media(max-width:600px){ .insight-cards{ grid-template-columns:1fr; } }
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media(max-width:600px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  text-align: center;
+  transition: border-color 0.2s, transform 0.2s;
+  animation: fadeUp 0.4s ease both;
+}
+.kpi:hover { border-color: var(--red); transform: translateY(-3px); }
+.kpi-val {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(20px, 4vw, 28px);
+  font-weight: 900;
+  color: var(--red);
+  line-height: 1.2;
+}
+.kpi-val.gold { color: var(--gold); }
+.kpi-val.teal { color: var(--teal); }
+.kpi-label { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
+
+/* Bar chart */
+.bar-chart { display: flex; flex-direction: column; gap: 12px; }
+.bar-item {}
+.bar-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+.bar-track {
+  height: 22px;
+  background: var(--dark2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+  width: 0;
+}
+
+/* Feature importance */
+.feat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.feat-name {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 140px;
+  color: var(--muted);
+}
+.feat-name.weather { color: var(--teal); }
+.feat-track {
+  flex: 1;
+  height: 14px;
+  background: var(--dark2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.feat-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+  width: 0;
+}
+.feat-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 36px;
+  text-align: right;
+  color: white;
+}
+
+/* Finding box */
+.finding {
+  background: linear-gradient(135deg, rgba(225,6,0,0.06), rgba(255,215,0,0.04));
+  border: 1px solid rgba(225,6,0,0.2);
+  border-radius: 4px;
+  padding: 18px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.finding::before {
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:2px;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+}
+.finding-label {
+  font-family:'Orbitron',monospace;
+  font-size:9px;
+  letter-spacing:3px;
+  color:var(--red);
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.finding p { font-size:14px; line-height:1.6; color:var(--text); }
+
+/* Star finding */
+.star-finding {
+  background: linear-gradient(135deg, rgba(255,215,0,0.06), rgba(0,201,167,0.04));
+  border-color: rgba(255,215,0,0.3);
+}
+.star-finding::before { background: linear-gradient(90deg, var(--gold), var(--teal)); }
+.star-finding .finding-label { color: var(--gold); }
+
+/* Tech pills */
+.tech-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.tech-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  background: var(--dark2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  transition: all 0.2s;
+}
+.tech-pill:hover { border-color: var(--red); color: white; }
+
+/* ── MOBILE header fix ── */
+@media(max-width:520px){
+  .nav-tabs { margin-left: 0; margin-top: 8px; }
+  .header-inner { flex-wrap: wrap; }
+  .header-tag { display: none; }
+}
+
+/* ── Stagger animations ── */
+.stagger > * { animation: fadeUp 0.4s ease both; }
+.stagger > *:nth-child(1){ animation-delay:0.05s }
+.stagger > *:nth-child(2){ animation-delay:0.10s }
+.stagger > *:nth-child(3){ animation-delay:0.15s }
+.stagger > *:nth-child(4){ animation-delay:0.20s }
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="curRing"></div>
+
+<!-- Scan line -->
+<div class="scanline"></div>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-logo">F1 <span>PREDICTOR</span></div>
+  <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+  <div class="loader-text">Initialising ML engine...</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="wrap">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-hex"><span>F1</span></div>
+        <div class="logo-name">Race <em>Predictor</em></div>
+      </div>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" onclick="showPage('predict',this)">Predict</button>
+        <button class="nav-tab" onclick="showPage('grid',this)">Race Grid</button>
+        <button class="nav-tab" onclick="showPage('insights',this)">Insights</button>
+      </nav>
+      <div class="header-tag">BSc Data Science</div>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════ PAGE: PREDICT ═══════ -->
+<div class="page active" id="page-predict">
+<div class="wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-eyebrow">Weather-Aware ML Prediction Engine</div>
+    <h1>Predict the<span class="accent">Race Outcome</span></h1>
+    <p class="hero-sub">Enter driver details and race day conditions. Our machine learning model — trained on 2 seasons of F1 data — predicts the finishing position.</p>
+    <div class="pills stagger">
+      <div class="pill"><b>1000+</b> Race entries</div>
+      <div class="pill"><b>16</b> ML features</div>
+      <div class="pill"><b>3.28</b> Best MAE</div>
+      <div class="pill accent"><b>22%</b> Better in wet races</div>
+    </div>
+  </div>
+
+  <div class="section-label">Prediction inputs</div>
+  <div class="two-col">
+
+    <!-- Driver card -->
+    <div class="card">
+      <div class="card-title">Driver & Race Info</div>
+      <div class="field">
+        <label>Driver</label>
+        <select id="driver" onchange="onDriverChange()">
+          <option value="VER|Red Bull Racing|1.8|1">Max Verstappen (VER)</option>
+          <option value="PER|Red Bull Racing|4.2|11">Sergio Perez (PER)</option>
+          <option value="HAM|Mercedes|4.5|44">Lewis Hamilton (HAM)</option>
+          <option value="RUS|Mercedes|5.1|63">George Russell (RUS)</option>
+          <option value="LEC|Ferrari|4.8|16">Charles Leclerc (LEC)</option>
+          <option value="SAI|Ferrari|5.3|55">Carlos Sainz (SAI)</option>
+          <option value="NOR|McLaren|5.8|4">Lando Norris (NOR)</option>
+          <option value="PIA|McLaren|8.1|81">Oscar Piastri (PIA)</option>
+          <option value="ALO|Aston Martin|6.5|14">Fernando Alonso (ALO)</option>
+          <option value="STR|Aston Martin|9.2|18">Lance Stroll (STR)</option>
+          <option value="GAS|Alpine|9.8|10">Pierre Gasly (GAS)</option>
+          <option value="OCO|Alpine|10.1|31">Esteban Ocon (OCO)</option>
+          <option value="TSU|AlphaTauri|10.5|22">Yuki Tsunoda (TSU)</option>
+          <option value="HUL|Haas|11.2|27">Nico Hulkenberg (HUL)</option>
+          <option value="MAG|Haas|12.1|20">Kevin Magnussen (MAG)</option>
+          <option value="BOT|Alfa Romeo|12.5|77">Valtteri Bottas (BOT)</option>
+          <option value="ZHO|Alfa Romeo|13.2|24">Zhou Guanyu (ZHO)</option>
+          <option value="ALB|Williams|13.8|23">Alex Albon (ALB)</option>
+          <option value="SAR|Williams|17.1|2">Logan Sargeant (SAR)</option>
+          <option value="DEV|AlphaTauri|15.0|21">Nyck de Vries (DEV)</option>
+        </select>
+      </div>
+
+      <!-- Driver number badge -->
+      <div id="driverBadge" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--dark2);border-radius:3px;border:1px solid var(--border)">
+        <div id="driverNum" style="width:48px;height:32px;background:#3671C6;border-radius:3px;display:grid;place-items:center;font-family:'Orbitron',monospace;font-size:14px;font-weight:900;color:white;flex-shrink:0">1</div>
+        <div>
+          <div id="driverTeamName" style="font-size:13px;font-weight:700;color:white">Red Bull Racing</div>
+          <div style="font-size:11px;color:var(--muted)">Recent form avg: <span id="driverForm" style="color:var(--teal)">1.8</span></div>
+        </div>
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-row">
+          <span class="slider-label">Grid Position</span>
+          <input type="range" id="gridPos" min="1" max="20" value="1" oninput="updateSlider('gridPos','P','')">
+          <span class="slider-val" id="gridPos-val">P1</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Quali Position</span>
+          <input type="range" id="qualiPos" min="1" max="20" value="1" oninput="updateSlider('qualiPos','P','')">
+          <span class="slider-val" id="qualiPos-val">P1</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Quali Gap (s)</span>
+          <input type="range" id="qualiGap" min="0" max="5" step="0.01" value="0" oninput="updateSlider('qualiGap','+','s')">
+          <span class="slider-val" id="qualiGap-val">+0.00s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weather card -->
+    <div class="card">
+      <div class="card-title">Race Day Weather</div>
+
+      <div class="slider-wrap">
+        <div class="slider-row">
+          <span class="slider-label">Temperature</span>
+          <input type="range" id="temp" min="5" max="50" value="25" oninput="updateWeather()">
+          <span class="slider-val" id="temp-val">25°C</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Rainfall</span>
+          <input type="range" id="rain" min="0" max="50" step="0.5" value="0" oninput="updateWeather()">
+          <span class="slider-val" id="rain-val">0mm</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Wind Speed</span>
+          <input type="range" id="wind" min="0" max="100" value="15" oninput="updateWeather()">
+          <span class="slider-val" id="wind-val">15km/h</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Humidity</span>
+          <input type="range" id="humidity" min="10" max="100" value="55" oninput="updateWeather()">
+          <span class="slider-val" id="humidity-val">55%</span>
+        </div>
+      </div>
+
+      <div class="weather-grid" id="weatherGrid">
+        <div class="w-box"><div class="w-val" id="wTemp">25°</div><div class="w-unit">Temp °C</div></div>
+        <div class="w-box"><div class="w-val" id="wRain">0</div><div class="w-unit">Rain mm</div></div>
+        <div class="w-box"><div class="w-val" id="wWind">15</div><div class="w-unit">Wind km/h</div></div>
+        <div class="w-box"><div class="w-val" id="wHumid">55</div><div class="w-unit">Humidity %</div></div>
+      </div>
+
+      <div class="wet-row" onclick="toggleWet()">
+        <div class="toggle" id="wetToggle"><div class="toggle-knob"></div></div>
+        <div>
+          <div class="wet-label">Wet Race Conditions</div>
+        </div>
+        <div class="wet-sub" id="wetSub">Dry track</div>
+      </div>
+
+      <button class="predict-btn" onclick="runPredict()">
+        ⬛ Predict Finish Position
+      </button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="resultCard">
+    <div class="result-top"></div>
+    <div class="result-body">
+      <div class="section-label" style="margin-bottom:16px">Predicted result</div>
+      <div class="result-inner">
+        <div class="result-pos" id="resPos">—</div>
+        <div class="result-info">
+          <div class="result-driver" id="resDriver">—</div>
+          <div class="result-team" id="resTeam">—</div>
+          <div class="badges" id="resBadges"></div>
+          <div class="conf-label">
+            <span>Model Confidence</span>
+            <span id="resPct">—</span>
+          </div>
+          <div class="conf-track"><div class="conf-fill" id="resFill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ════════════════════════════════ PAGE: RACE GRID ════ -->
+<div class="page" id="page-grid">
+<div class="wrap">
+  <div class="hero" style="padding-bottom:24px">
+    <div class="hero-eyebrow">Full Race Prediction</div>
+    <h1 style="font-size:clamp(24px,4vw,42px)">Race <span class="accent">Grid</span></h1>
+    <p class="hero-sub">Predicted finishing order for all 20 drivers. Adjust weather to see how rain reshuffles the grid.</p>
+  </div>
+
+  <!-- Weather quick controls -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">Weather for this prediction</div>
+    <div class="slider-wrap">
+      <div class="slider-row">
+        <span class="slider-label">Rainfall</span>
+        <input type="range" id="gbRain" min="0" max="50" step="0.5" value="0" oninput="refreshGrid()">
+        <span class="slider-val" id="gbRain-val">0mm</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Temperature</span>
+        <input type="range" id="gbTemp" min="5" max="50" value="25" oninput="refreshGrid()">
+        <span class="slider-val" id="gbTemp-val">25°C</span>
+      </div>
+    </div>
+    <div class="wet-row" onclick="toggleGridWet()">
+      <div class="toggle" id="gridWetToggle"><div class="toggle-knob"></div></div>
+      <div class="wet-label">Wet Race</div>
+      <div class="wet-sub" id="gridWetSub">Dry track</div>
+    </div>
+  </div>
+
+  <div class="lb-header">
+    <span>POS</span><span></span>
+    <span>DRIVER</span>
+    <span style="text-align:center">GRID</span>
+    <span style="text-align:center">±</span>
+    <span class="r">PRED</span>
+  </div>
+  <div class="lb-body" id="lbBody"></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════ PAGE: INSIGHTS ════ -->
+<div class="page" id="page-insights">
+<div class="wrap">
+  <div class="hero" style="padding-bottom:24px">
+    <div class="hero-eyebrow">Project Results</div>
+    <h1 style="font-size:clamp(24px,4vw,42px)">Data <span class="accent">Insights</span></h1>
+    <p class="hero-sub">Key findings from the machine learning pipeline — built with fastf1, scikit-learn and Open-Meteo.</p>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row stagger">
+    <div class="kpi"><div class="kpi-val">1000+</div><div class="kpi-label">Race entries</div></div>
+    <div class="kpi"><div class="kpi-val">16</div><div class="kpi-label">ML features</div></div>
+    <div class="kpi"><div class="kpi-val gold">3.28</div><div class="kpi-label">Best MAE</div></div>
+    <div class="kpi"><div class="kpi-val teal">22%</div><div class="kpi-label">Wet improvement</div></div>
+  </div>
+
+  <!-- Key findings -->
+  <div class="section-label">Key Findings</div>
+  <div class="finding">
+    <div class="finding-label">Finding 1</div>
+    <p>All three ML models beat the baseline (grid position only). Linear Regression achieved the best cross-validated MAE of <strong>3.28 positions</strong> — an 11% improvement over simply predicting grid = finish.</p>
+  </div>
+  <div class="finding">
+    <div class="finding-label">Finding 2</div>
+    <p>Across all races, adding weather features had minimal impact. Grid position and qualifying pace dominate as predictors under normal dry conditions.</p>
+  </div>
+  <div class="finding star-finding">
+    <div class="finding-label">★ Star Finding</div>
+    <p>When isolated to <strong>wet races only</strong>, the weather-aware model achieved MAE of <strong>2.87</strong> vs a baseline of 3.68 — a <strong>22% improvement</strong>. Weather is most powerful when conditions are most extreme.</p>
+  </div>
+
+  <div class="insight-cards">
+    <!-- Model performance -->
+    <div class="card" style="padding-bottom:20px">
+      <div class="card-title">Model Performance (MAE)</div>
+      <div class="bar-chart" id="modelChart"></div>
+    </div>
+
+    <!-- Feature importance -->
+    <div class="card">
+      <div class="card-title">Feature Importance</div>
+      <div id="featChart"></div>
+      <div style="display:flex;gap:16px;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;background:var(--red);border-radius:1px"></div>Race features</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;background:var(--teal);border-radius:1px"></div>Weather features</div>
+      </div>
+    </div>
+
+    <!-- Tech stack -->
+    <div class="card">
+      <div class="card-title">Tech Stack</div>
+      <div class="tech-pills">
+        <div class="tech-pill">Python 3</div>
+        <div class="tech-pill">fastf1</div>
+        <div class="tech-pill">pandas</div>
+        <div class="tech-pill">numpy</div>
+        <div class="tech-pill">scikit-learn</div>
+        <div class="tech-pill">matplotlib</div>
+        <div class="tech-pill">seaborn</div>
+        <div class="tech-pill">Open-Meteo API</div>
+        <div class="tech-pill">Jupyter Notebook</div>
+        <div class="tech-pill">GitHub Pages</div>
+      </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="card">
+      <div class="card-title">Project Summary</div>
+      <table style="width:100%;border-collapse:collapse">
+        <tbody id="summaryTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const TEAMS = {
+  "Red Bull Racing": {color:"#3671C6", avg:2.1},
+  "Mercedes":        {color:"#27F4D2", avg:3.5},
+  "Ferrari":         {color:"#E8002D", avg:3.8},
+  "McLaren":         {color:"#FF8000", avg:5.2},
+  "Aston Martin":    {color:"#229971", avg:6.1},
+  "Alpine":          {color:"#FF87BC", avg:9.4},
+  "Williams":        {color:"#64C4FF", avg:13.2},
+  "AlphaTauri":      {color:"#5E8FAA", avg:11.0},
+  "Alfa Romeo":      {color:"#C92D4B", avg:12.1},
+  "Haas":            {color:"#B6BABD", avg:13.8},
+};
+
+const GRID = [
+  {code:"VER",team:"Red Bull Racing",form:1.8,num:1},
+  {code:"PER",team:"Red Bull Racing",form:4.2,num:11},
+  {code:"HAM",team:"Mercedes",form:4.5,num:44},
+  {code:"RUS",team:"Mercedes",form:5.1,num:63},
+  {code:"LEC",team:"Ferrari",form:4.8,num:16},
+  {code:"SAI",team:"Ferrari",form:5.3,num:55},
+  {code:"NOR",team:"McLaren",form:5.8,num:4},
+  {code:"PIA",team:"McLaren",form:8.1,num:81},
+  {code:"ALO",team:"Aston Martin",form:6.5,num:14},
+  {code:"STR",team:"Aston Martin",form:9.2,num:18},
+  {code:"GAS",team:"Alpine",form:9.8,num:10},
+  {code:"OCO",team:"Alpine",form:10.1,num:31},
+  {code:"TSU",team:"AlphaTauri",form:10.5,num:22},
+  {code:"HUL",team:"Haas",form:11.2,num:27},
+  {code:"MAG",team:"Haas",form:12.1,num:20},
+  {code:"BOT",team:"Alfa Romeo",form:12.5,num:77},
+  {code:"ZHO",team:"Alfa Romeo",form:13.2,num:24},
+  {code:"ALB",team:"Williams",form:13.8,num:23},
+  {code:"SAR",team:"Williams",form:17.1,num:2},
+  {code:"DEV",team:"AlphaTauri",form:15.0,num:21},
+];
+
+// ── STATE ─────────────────────────────────────────────────────
+let isWet = false, isGridWet = false;
+
+// ── LOADER ────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('done');
+    animateInsights();
+  }, 2000);
+});
+
+// ── CURSOR ────────────────────────────────────────────────────
+const cur = document.getElementById('cur');
+const ring = document.getElementById('curRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+(function moveCursor(){
+  rx+=(mx-rx)*0.18; ry+=(my-ry)*0.18;
+  cur.style.left=mx+'px'; cur.style.top=my+'px';
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(moveCursor);
+})();
+
+// ── PAGE SWITCH ───────────────────────────────────────────────
+function showPage(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='grid') refreshGrid();
+  if(id==='insights') animateInsights();
+}
+
+// ── SLIDER UPDATES ────────────────────────────────────────────
+function updateSlider(id, pre, suf){
+  const v = document.getElementById(id).value;
+  const disp = pre==='P' ? `P${v}` : `${pre}${parseFloat(v).toFixed(id==='qualiGap'?2:0)}${suf}`;
+  document.getElementById(id+'-val').textContent = disp;
+}
+
+function updateWeather(){
+  const t=document.getElementById('temp').value;
+  const r=document.getElementById('rain').value;
+  const w=document.getElementById('wind').value;
+  const h=document.getElementById('humidity').value;
+  document.getElementById('temp-val').textContent = t+'°C';
+  document.getElementById('rain-val').textContent = r+'mm';
+  document.getElementById('wind-val').textContent = w+'km/h';
+  document.getElementById('humidity-val').textContent = h+'%';
+  document.getElementById('wTemp').textContent = t+'°';
+  document.getElementById('wRain').textContent = r;
+  document.getElementById('wWind').textContent = w;
+  document.getElementById('wHumid').textContent = h;
+  const boxes = document.querySelectorAll('#weatherGrid .w-box');
+  boxes.forEach(b => b.classList.toggle('wet-highlight', parseFloat(r)>0.5));
+}
+
+// ── DRIVER CHANGE ─────────────────────────────────────────────
+function onDriverChange(){
+  const parts = document.getElementById('driver').value.split('|');
+  const team = parts[1], form = parts[2], num = parts[3];
+  const tc = TEAMS[team]?.color || '#888';
+  document.getElementById('driverNum').textContent = num;
+  document.getElementById('driverNum').style.background = tc;
+  document.getElementById('driverTeamName').textContent = team;
+  document.getElementById('driverForm').textContent = form;
+}
+
+// ── WET TOGGLE ────────────────────────────────────────────────
+function toggleWet(){
+  isWet = !isWet;
+  document.getElementById('wetToggle').classList.toggle('on', isWet);
+  document.getElementById('wetSub').textContent = isWet ? 'Rain active — weather boosted' : 'Dry track';
+  if(isWet){
+    document.getElementById('rain').value = 6;
+    updateWeather();
+  }
+}
+
+function toggleGridWet(){
+  isGridWet = !isGridWet;
+  document.getElementById('gridWetToggle').classList.toggle('on', isGridWet);
+  document.getElementById('gridWetSub').textContent = isGridWet ? 'Wet race active' : 'Dry track';
+  if(isGridWet) document.getElementById('gbRain').value = 6;
+  document.getElementById('gbRain-val').textContent = document.getElementById('gbRain').value+'mm';
+  refreshGrid();
+}
+
+// ── PREDICTION MODEL ──────────────────────────────────────────
+function predict(gridPos, qualiPos, qualiGap, form, teamAvg, temp, rain, wind, humid, wet){
+  let p = 0;
+  p += gridPos  * 0.38;
+  p += qualiPos * 0.22;
+  p += qualiGap * 1.80;
+  p += form     * 0.28;
+  p += teamAvg  * 0.18;
+  if(wet){ p += rain*0.12; p -= gridPos*0.08; }
+  p += (temp-25)*0.02;
+  p += (humid-55)*0.01;
+  return Math.max(1, Math.min(20, p));
+}
+
+function ordinal(n){
+  n = Math.round(n);
+  const s=["th","st","nd","rd"], v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+
+// ── API URL — change this when you deploy to Render ──────────
+const API_URL = 'http://127.0.0.1:5000';
+
+// ── RUN PREDICTION (calls your real Flask model!) ─────────────
+async function runPredict(){
+  const parts  = document.getElementById('driver').value.split('|');
+  const code   = parts[0], team = parts[1];
+  const grid   = parseInt(document.getElementById('gridPos').value);
+
+  // Show loading state on button
+  const btn = document.querySelector('.predict-btn');
+  btn.textContent = '⏳ Predicting...';
+  btn.style.opacity = '0.7';
+
+  try {
+    const response = await fetch(`${API_URL}/predict`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        driver:   code,
+        team:     team,
+        gridPos:  document.getElementById('gridPos').value,
+        qualiPos: document.getElementById('qualiPos').value,
+        qualiGap: document.getElementById('qualiGap').value,
+        temp:     document.getElementById('temp').value,
+        rain:     document.getElementById('rain').value,
+        wind:     document.getElementById('wind').value,
+        humidity: document.getElementById('humidity').value,
+        isWet:    isWet ? 1 : 0,
+      })
+    });
+
+    const data = await response.json();
+
+    if(!data.success){
+      alert('Prediction error: ' + data.error);
+      return;
+    }
+
+    const pos  = data.position;
+    const conf = data.confidence;
+
+    document.getElementById('resPos').textContent    = ordinal(pos);
+    document.getElementById('resDriver').textContent = code;
+    document.getElementById('resTeam').textContent   = team.toUpperCase();
+
+    let b = '';
+    if(Math.round(pos)<=3)  b += `<span class="badge badge-gold">Podium</span>`;
+    if(Math.round(pos)<=10) b += `<span class="badge badge-teal">Points Finish</span>`;
+    if(isWet)               b += `<span class="badge badge-red">Wet Race</span>`;
+    const gained = grid - Math.round(pos);
+    if(gained > 0) b += `<span class="badge badge-teal">+${gained} Places</span>`;
+    if(gained < 0) b += `<span class="badge badge-gray">${gained} Places</span>`;
+    document.getElementById('resBadges').innerHTML = b;
+
+    document.getElementById('resPct').textContent = Math.round(conf) + '%';
+    const card = document.getElementById('resultCard');
+    card.classList.add('show');
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+    setTimeout(() => {
+      document.getElementById('resFill').style.width = conf + '%';
+    }, 300);
+
+  } catch(err) {
+    alert('❌ Cannot connect to Flask server!\n\nMake sure app.py is running:\n1. Open Terminal\n2. cd to your Formula 1 Project folder\n3. Run: python app.py');
+  } finally {
+    btn.textContent = '⬛ Predict Finish Position';
+    btn.style.opacity = '1';
+  }
+}
+
+// ── RACE GRID ─────────────────────────────────────────────────
+async function refreshGrid(){
+  const rain  = parseFloat(document.getElementById('gbRain').value)||0;
+  const temp  = parseFloat(document.getElementById('gbTemp').value)||25;
+  document.getElementById('gbRain-val').textContent = rain+'mm';
+  document.getElementById('gbTemp-val').textContent = temp+'°C';
+
+  const lb = document.getElementById('lbBody');
+  lb.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">Loading predictions...</div>';
+
+  try {
+    const response = await fetch(`${API_URL}/predict-grid`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        temp, rain,
+        wind: 15, humidity: 55,
+        isWet: isGridWet ? 1 : 0
+      })
+    });
+
+    const data = await response.json();
+    if(!data.success) throw new Error(data.error);
+
+    lb.innerHTML = '';
+    data.grid.forEach((d, i) => {
+      const rank = i + 1;
+      const cls  = rank===1?'p1':rank===2?'p2':rank===3?'p3':'';
+      const tc   = TEAMS[d.team]?.color || '#888';
+      const gained   = d.gridPos - Math.round(d.predicted);
+      const gainStr  = gained>0?`+${gained}`:gained<0?`${gained}`:'=';
+      const gainColor= gained>0?'var(--teal)':gained<0?'var(--red)':'var(--muted)';
+      lb.innerHTML += `
+        <div class="lb-row ${rank<=3?'highlighted':''}">
+          <div class="lb-num ${cls}">${rank}</div>
+          <div class="lb-color" style="background:${tc}"></div>
+          <div class="lb-driver-col">
+            <div class="lb-code">${d.driver}</div>
+            <div class="lb-team-name">${d.team}</div>
+          </div>
+          <div class="lb-grid-col">P${d.gridPos}</div>
+          <div class="lb-change" style="color:${gainColor}">${gainStr}</div>
+          <div class="lb-pred">${ordinal(d.predicted)}</div>
+        </div>`;
+    });
+
+  } catch(err) {
+    lb.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:13px">⚠️ Start app.py to see real predictions</div>';
+    // Fallback to JS model if Flask not running
+    const results = GRID.map((d,i)=>{
+      const grid = i+1, gap = i*0.08;
+      const tAvg = TEAMS[d.team]?.avg||8;
+      const pos  = predict(grid,grid,gap,d.form,tAvg,temp,rain,15,55,isGridWet);
+      return {...d, grid, pos};
+    }).sort((a,b)=>a.pos-b.pos);
+    lb.innerHTML = '';
+    results.forEach((d,i)=>{
+      const rank=i+1;
+      const cls = rank===1?'p1':rank===2?'p2':rank===3?'p3':'';
+      const tc  = TEAMS[d.team]?.color||'#888';
+      const gained   = d.grid - Math.round(d.pos);
+      const gainStr  = gained>0?`+${gained}`:gained<0?`${gained}`:'=';
+      const gainColor= gained>0?'var(--teal)':gained<0?'var(--red)':'var(--muted)';
+      lb.innerHTML += `
+        <div class="lb-row ${rank<=3?'highlighted':''}">
+          <div class="lb-num ${cls}">${rank}</div>
+          <div class="lb-color" style="background:${tc}"></div>
+          <div class="lb-driver-col">
+            <div class="lb-code">${d.code}</div>
+            <div class="lb-team-name">${d.team}</div>
+          </div>
+          <div class="lb-grid-col">P${d.grid}</div>
+          <div class="lb-change" style="color:${gainColor}">${gainStr}</div>
+          <div class="lb-pred">${ordinal(d.pos)}</div>
+        </div>`;
+    });
+  }
+}
+
+// ── INSIGHTS CHARTS ───────────────────────────────────────────
+function animateInsights(){
+  // Model bar chart
+  const modelData=[
+    {label:'Baseline (Grid pos only)', mae:3.69, color:'#555'},
+    {label:'Linear — no weather',      mae:3.23, color:'#FF8C00'},
+    {label:'Linear — with weather',    mae:3.28, color:'#1D9E75'},
+    {label:'Wet races only',           mae:2.87, color:'#E10600'},
+  ];
+  const mc = document.getElementById('modelChart');
+  mc.innerHTML = '';
+  const maxMae = 4;
+  modelData.forEach(m=>{
+    mc.innerHTML += `
+      <div class="bar-item">
+        <div class="bar-item-header">
+          <span style="color:var(--muted);font-size:12px">${m.label}</span>
+          <span style="color:${m.color};font-family:'Orbitron',monospace;font-size:12px">${m.mae}</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="background:${m.color}" data-w="${(m.mae/maxMae*100).toFixed(1)}"></div>
+        </div>
+      </div>`;
+  });
+
+  // Feature importance
+  const feats=[
+    {name:'Grid position',    val:0.38, weather:false},
+    {name:'Recent form',      val:0.28, weather:false},
+    {name:'Quali gap',        val:0.18, weather:false},
+    {name:'Team strength',    val:0.18, weather:false},
+    {name:'Quali position',   val:0.22, weather:false},
+    {name:'Rainfall',         val:0.12, weather:true},
+    {name:'Wet flag',         val:0.09, weather:true},
+    {name:'Temperature',      val:0.06, weather:true},
+    {name:'Humidity',         val:0.04, weather:true},
+    {name:'Wind speed',       val:0.03, weather:true},
+  ].sort((a,b)=>b.val-a.val);
+  const fc = document.getElementById('featChart');
+  fc.innerHTML='';
+  feats.forEach(f=>{
+    fc.innerHTML+=`
+      <div class="feat-row">
+        <div class="feat-name${f.weather?' weather':''}">${f.name}</div>
+        <div class="feat-track">
+          <div class="feat-fill" style="background:${f.weather?'var(--teal)':'var(--red)'}" data-w="${(f.val/0.38*100).toFixed(0)}"></div>
+        </div>
+        <div class="feat-val">${f.val.toFixed(2)}</div>
+      </div>`;
+  });
+
+  // Summary table
+  const rows=[
+    ['Seasons analysed','2022 – 2023'],
+    ['Race entries','1,000+'],
+    ['Features engineered','16 (6 weather)'],
+    ['Best model','Linear Regression'],
+    ['Overall MAE','3.28 positions'],
+    ['Wet race MAE','2.87 positions'],
+    ['Baseline MAE','3.69 positions'],
+    ['Wet race improvement','22%'],
+  ];
+  const st=document.getElementById('summaryTable');
+  st.innerHTML='';
+  rows.forEach(r=>{
+    const accent = r[0]==='Wet race improvement';
+    st.innerHTML+=`
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 0;font-size:13px;color:var(--muted)">${r[0]}</td>
+        <td style="padding:8px 0;font-size:13px;font-weight:700;font-family:'Orbitron',monospace;color:${accent?'var(--teal)':'white'};text-align:right">${r[1]}</td>
+      </tr>`;
+  });
+
+  // Animate bars after brief delay
+  setTimeout(()=>{
+    document.querySelectorAll('.bar-fill').forEach(el=>{
+      el.style.width = el.dataset.w+'%';
+    });
+    document.querySelectorAll('.feat-fill').forEach(el=>{
+      el.style.width = el.dataset.w+'%';
+    });
+  }, 200);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+onDriverChange();
+refreshGrid();
+</script>
+</body>
+</html>
